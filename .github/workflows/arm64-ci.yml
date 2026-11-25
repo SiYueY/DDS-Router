@@ -1,0 +1,40 @@
+name: Ubuntu 24.04 ARM64 validation
+
+on:
+  push:
+    branches: [arm64-ci-2.3.0]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Check native platform
+        run: |
+          test "$(uname -m)" = aarch64
+          . /etc/os-release
+          test "$VERSION_ID" = 24.04
+          gcc --version
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake git libasio-dev libtinyxml2-dev libssl-dev libyaml-cpp-dev python3-yaml zip unzip file patchelf
+      - name: Build pinned dependencies and DDS Router
+        run: bash .github/arm64/build.sh "$RUNNER_TEMP/router-build"
+      - name: Package and verify
+        run: bash .github/arm64/package.sh "$RUNNER_TEMP/router-build" "$RUNNER_TEMP/router-dist"
+      - name: Upload portable archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: ddsrouter-2.3.0-ubuntu24.04-arm64
+          path: |
+            ${{ runner.temp }}/router-dist/*.zip
+            ${{ runner.temp }}/router-dist/*.sha256
+          if-no-files-found: error
