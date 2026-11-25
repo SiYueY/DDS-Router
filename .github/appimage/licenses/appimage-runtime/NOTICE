@@ -1,0 +1,14 @@
+AppImage Type 2 Runtime, release 20251108
+Source: https://github.com/AppImage/type2-runtime/tree/dd6cebedcbddde9c82f89b011e8e1d40b6e43868
+License source: LICENSE at the same revision (unmodified).
+The embedded runtime includes statically linked third-party libraries.
+The upstream LICENSE identifies their terms. Public distribution requires
+review of the complete notices and applicable source-delivery obligations.
+
+The pinned Runtime build script downloads libfuse 3.15.0 and squashfuse 0.5.2:
+https://github.com/AppImage/type2-runtime/blob/dd6cebedcbddde9c82f89b011e8e1d40b6e43868/scripts/common/install-dependencies.sh
+The corresponding upstream license texts are included here unchanged.
+libfuse is patched by the Runtime build; the patch is in patches/libfuse.
+The Runtime Makefile also links mimalloc, in addition to the libraries
+identified in the upstream LICENSE. Exact Alpine-provided library revisions
+and complete redistribution obligations remain to be verified.

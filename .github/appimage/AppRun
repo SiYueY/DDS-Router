@@ -1,0 +1,7 @@
+#!/bin/sh
+# Preserve the caller's working directory and all native CLI arguments.
+set -eu
+root="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
+unset LD_PRELOAD
+export LD_LIBRARY_PATH="$root/usr/lib"
+exec "$root/usr/bin/ddsrouter" "$@"

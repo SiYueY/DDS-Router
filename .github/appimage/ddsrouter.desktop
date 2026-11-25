@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=DDS Router
+Comment=Route DDS data between networks
+Exec=ddsrouter
+Icon=ddsrouter
+Terminal=true
+Categories=Network;

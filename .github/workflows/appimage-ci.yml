@@ -1,0 +1,158 @@
+name: ROS 2 Bridge AppImage
+
+on:
+  push:
+    branches: [ros2-bridge]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build ${{ matrix.distro }} / ${{ matrix.arch }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - distro: humble
+            arch: amd64
+            runner: ubuntu-22.04
+            os: '22.04'
+            machine: x86_64
+          - distro: humble
+            arch: arm64
+            runner: ubuntu-22.04-arm
+            os: '22.04'
+            machine: aarch64
+          - distro: jazzy
+            arch: amd64
+            runner: ubuntu-24.04
+            os: '24.04'
+            machine: x86_64
+          - distro: jazzy
+            arch: arm64
+            runner: ubuntu-24.04-arm
+            os: '24.04'
+            machine: aarch64
+    env:
+      ARTIFACT: ddsrouter-2.3.0-${{ matrix.distro }}-${{ matrix.arch }}
+      TARGET_OS: ${{ matrix.os }}
+      TARGET_MACHINE: ${{ matrix.machine }}
+    steps:
+      - name: Initialize runner paths
+        # Runner context is unavailable in job-level env. Publish paths only
+        # after the runner has been assigned, for all subsequent steps.
+        run: |
+          set -euo pipefail
+          {
+            printf 'BUILD_DIR=%s/router-build\n' "$RUNNER_TEMP"
+            printf 'TOOLS_DIR=%s/appimage-tools\n' "$RUNNER_TEMP"
+            printf 'OUTPUT_DIR=%s/router-dist\n' "$RUNNER_TEMP"
+          } >> "$GITHUB_ENV"
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Verify native runner
+        run: |
+          set -euo pipefail
+          . /etc/os-release
+          test "$ID" = ubuntu
+          test "$VERSION_ID" = "$TARGET_OS"
+          test "$(uname -m)" = "$TARGET_MACHINE"
+          uname -a
+          gcc --version
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake git libasio-dev libtinyxml2-dev libssl-dev \
+            libyaml-cpp-dev python3-yaml file patchelf curl shellcheck \
+            desktop-file-utils squashfs-tools fuse3 zip unzip
+      - name: Validate CI scripts
+        run: |
+          set -euo pipefail
+          for script in .github/appimage/*.sh; do
+            bash -n "$script"
+          done
+          sh -n .github/appimage/AppRun
+          shellcheck -x .github/appimage/*.sh .github/appimage/AppRun
+          python3 -m py_compile .github/appimage/*.py
+          desktop-file-validate .github/appimage/ddsrouter.desktop
+      - name: Verify pinned AppImage tools
+        run: bash .github/appimage/tools.sh "$TOOLS_DIR"
+      - name: Build DDS Router and dependencies
+        run: bash .github/appimage/build.sh "$BUILD_DIR"
+      - name: Package AppImage
+        run: bash .github/appimage/package.sh "$BUILD_DIR" "$TOOLS_DIR" "$OUTPUT_DIR"
+      - name: Test AppImage
+        run: |
+          set -euo pipefail
+          if [[ ! -c /dev/fuse ]]; then
+            sudo modprobe fuse
+          fi
+          test -c /dev/fuse
+          test -r /dev/fuse
+          test -w /dev/fuse
+          libraries="$(find "$BUILD_DIR/install" -type f -name '*.so*' -printf '%h\n' | sort -u | paste -sd:)"
+          for mode in extract mount; do
+            python3 .github/appimage/test_appimage.py "$BUILD_DIR/install/bin/ddsrouter" \
+              "$OUTPUT_DIR/$ARTIFACT.AppImage" .github/appimage/smoke.yaml \
+              --library-path "$libraries" --mode "$mode"
+          done
+      - name: Verify clean target without FUSE or ROS
+        run: |
+          set -euo pipefail
+          docker run --rm --network none --user 1000:1000 \
+            -v "$OUTPUT_DIR:/artifacts:ro" \
+            -v "$GITHUB_WORKSPACE/.github/appimage/smoke.yaml:/test.yaml:ro" \
+            -e APPIMAGE_EXTRACT_AND_RUN=1 -e IMAGE_NAME="$ARTIFACT.AppImage" \
+            "ubuntu:$TARGET_OS" sh -ec '
+              test ! -e /dev/fuse
+              test ! -d /opt/ros
+              libraries=$(ldconfig -p)
+              if printf "%s\n" "$libraries" | grep -q libfuse; then
+                echo "Unexpected libfuse installation" >&2
+                exit 1
+              fi
+              "/artifacts/$IMAGE_NAME" --version
+              "/artifacts/$IMAGE_NAME" -c /test.yaml -t 2
+            '
+      - name: Upload verified platform artifact
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: ${{ env.ARTIFACT }}
+          path: |
+            ${{ env.OUTPUT_DIR }}/*.AppImage
+            ${{ env.OUTPUT_DIR }}/*.AppImage.sha256
+            ${{ env.OUTPUT_DIR }}/build-info.txt
+          if-no-files-found: error
+          compression-level: 0
+
+  aggregate:
+    name: Assemble complete release bundle
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          pattern: ddsrouter-2.3.0-*
+          path: ${{ runner.temp }}/platforms
+      - name: Verify and assemble
+        run: bash .github/appimage/aggregate.sh "$RUNNER_TEMP/platforms" "$RUNNER_TEMP/release"
+      - name: Upload final bundle
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: ddsrouter-2.3.0
+          path: |
+            ${{ runner.temp }}/release/ddsrouter-2.3.0.zip
+            ${{ runner.temp }}/release/ddsrouter-2.3.0.zip.sha256
+          if-no-files-found: error
+          compression-level: 0

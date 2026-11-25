@@ -1,0 +1,9 @@
+DDS Router product identification icon
+Upstream: eProsima DDS-Monitor
+Source: https://github.com/eProsima/DDS-Monitor/blob/06254c78c234ac7960e4ba59a839e64fa404e110/resources/images/app_icons/DDS_ROUTER.svg
+Git blob: a4614bc44092228b30b72703062af11a0bbc2c5b
+The upstream SVG is included unmodified under the local name ddsrouter.svg.
+The accompanying LICENSE is the upstream repository's GPL version 3 license.
+It is provided separately from the Apache-2.0 license of DDS Router.
+Product names and marks belong to their respective owners. This independent
+AppImage build is not an official eProsima distribution or endorsement.

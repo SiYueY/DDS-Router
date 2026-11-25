@@ -47,6 +47,13 @@ Following are some of the key features of *eProsima DDS Router*:
 ![eProsima DDS Router overall architecture](docs/rst/figures/ddsrouter_cloud_white_background.png)
 
 
+## Portable Linux builds (this fork)
+
+The ros2-bridge branch provides independently maintained DDS Router 2.3.0
+AppImages for Ubuntu 22.04 and 24.04 on amd64 and arm64. See the
+[AppImage build and usage guide](.github/appimage/README.md) for downloads,
+runtime requirements, local builds, verification and packaging limitations.
+
 ## Documentation
 
 You can access the documentation online, which is hosted on [Read the Docs](https://eprosima-dds-router.readthedocs.io).

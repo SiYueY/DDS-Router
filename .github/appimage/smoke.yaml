@@ -1,0 +1,17 @@
+# DDS Router 2.3.0 smoke test; loopback only, no physical robot access.
+version: v4.0
+
+participants:
+  - name: domain_90
+    kind: local
+    domain: 90
+    transport: udp
+    whitelist-interfaces:
+      - "127.0.0.1"
+
+  - name: domain_91
+    kind: local
+    domain: 91
+    transport: udp
+    whitelist-interfaces:
+      - "127.0.0.1"
